@@ -1,0 +1,82 @@
+name: "🐞 Bug Report (錯誤回報)"
+description: "提交錯誤報告以幫助我們改進應用程式。"
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝您花時間填寫此錯誤報告！請先搜尋現有問題，確保您遇到的問題尚未被回報。
+        (Thanks for taking the time to fill out this bug report! Please search existing issues to ensure you are not creating a duplicate.)
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: "錯誤描述 (Bug Description)"
+      description: "請清晰且簡潔地描述您遇到的錯誤。"
+      placeholder: "當我嘗試...時，應用程式發生了...的錯誤。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: "重現步驟 (Steps to Reproduce)"
+      description: "請提供重現此錯誤的詳細步驟。"
+      value: |
+        1. 前往 '...'
+        2. 點擊 '....'
+        3. 向下滾動至 '....'
+        4. 看到錯誤
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: "預期行為 (Expected Behavior)"
+      description: "請簡潔地描述您預期應該發生的情況。"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: "作業系統 (Operating System)"
+      description: "您在哪個作業系統上遇到此問題？"
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: "應用程式版本 (App Version)"
+      description: "請提供您正在使用的應用程式版本號。"
+      placeholder: "e.g. 2.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: "GPU (顯示卡)"
+      description: "如果您認為問題與 GPU 加速有關，請提供您的顯示卡型號。"
+      placeholder: "e.g. NVIDIA RTX 3070"
+
+  - type: input
+    id: nvidia-driver
+    attributes:
+      label: "NVIDIA 驅動程式版本 (NVIDIA Driver Version)"
+      description: "如果適用，請提供您的 NVIDIA 驅動程式版本。"
+      placeholder: "e.g. 536.99"
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "補充說明 (Additional Context)"
+      description: "在此處添加有關該問題的任何其他上下文、日誌或螢幕截圖。"

@@ -1,0 +1,39 @@
+name: "✨ Feature Request (功能請求)"
+description: "為這個專案建議一個新的想法或功能。"
+title: "[FEAT] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝您提出功能請求！請先搜尋現有問題，確保您的想法尚未被提出。
+        (Thanks for suggesting a feature! Please search existing issues to ensure you are not creating a duplicate.)
+
+  - type: textarea
+    id: related-problem
+    attributes:
+      label: "您的功能請求是否與某個問題有關？(Is your feature request related to a problem?)"
+      description: "請描述您遇到的困擾，說明為什麼需要這個新功能。"
+      placeholder: "當...的時候，我總是感到很困擾，如果能有...功能就好了。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "描述您想要的解決方案 (Describe the solution you'd like)"
+      description: "請清晰且簡潔地描述您希望實現的功能。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "描述您考慮過的替代方案 (Describe alternatives you've considered)"
+      description: "請描述您曾考慮過的其他解決方案或功能。"
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "補充說明 (Additional Context)"
+      description: "在此處添加任何其他關於此功能請求的上下文或螢幕截圖。"

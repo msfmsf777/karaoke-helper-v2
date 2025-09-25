@@ -8,6 +8,7 @@
 ----
 ![Splash](https://i.imgur.com/0RWhoxL.png)  
 ![UI](https://i.imgur.com/rJrG6nC.png)
+>感謝[菲比](https://x.com/fibimeow222)繪製的Logo圖
 ----------
 ## ✨ 功能特色
 

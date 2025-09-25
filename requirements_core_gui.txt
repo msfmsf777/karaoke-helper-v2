@@ -1,0 +1,12 @@
+# UI
+FreeSimpleGUI==5.2.0.post1
+
+# core audio/processing
+numpy==2.2.6
+pydub==0.25.1
+sounddevice==0.5.2
+pyloudnorm==0.1.1
+stftpitchshift==2.0
+
+# networking for update checks / web access
+requests

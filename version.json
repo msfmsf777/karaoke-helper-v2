@@ -1,8 +1,15 @@
 {
-  "version": "2.0.0",
-  "download_url": "https://github.com/msfmsf777/karaoke-helper-v2/releases/tag/v2.0.0",
+  "version": "2.0.0", 
+  "download_url": "https://github.com/msfmsf777/karaoke-helper-v2/releases/tag/v2.1.0",
   "notes": [
-    "第一版的小幫手~ 使用愉快~",
-    " "
+    "[THIS VERSION IS CURRECTLY STILL IN TEST [BETA]",
+    "1.【多語言支持】現在可以在APP内變更顯示語言，當前支持簡/繁中文，英文和日文，以後可能會加入更多語言！若想要請求新語言，可以前往【幫助】-【回報錯誤/建議】提供建議！",
+    "2. APP内界面UI優化，檔案總管等界面現在更整齊惹~ 應該吧！",
+    "=======",
+    "1. [Multilingual support] You can now switch the app’s display language. Currently supports Simplified Chinese, Traditional Chinese, English, and Japanese—more coming! To request a new language, go to Help → Feedback/Requests.",
+    "2. UI polish: The File Explorer and other screens are cleaner and more organized—probably!",
+    "=======",
+    "1.【多言語対応】 アプリ内で表示言語を切り替えられるようになりました。現時点では簡体字/繁体字中国語・英語・日本語に対応。今後も追加予定です！新しい言語の希望は 「ヘルプ → 不具合/要望」 からどうぞ。",
+    "2. UIを微調整： ファイル画面などをスッキリ整理しました（たぶん！）。"
   ]
 }

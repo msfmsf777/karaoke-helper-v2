@@ -6,7 +6,7 @@
 
   
 
-# v2.1.0 - 白芙妮的伴唱小幫手 v2 (KHelperV2)
+# v2.2.0 - 白芙妮的伴唱小幫手 v2 (KHelperV2)
 
 A multi‑purpose audio tool built for **streamers, singers, and VTubers**.
 
@@ -22,9 +22,9 @@ A multi‑purpose audio tool built for **streamers, singers, and VTubers**.
 
 ----
 
-![Splash](https://i.imgur.com/0RWhoxL.png)
+![Splash](https://i.imgur.com/VQ1jLQT.png)
 
-![UI EN](https://i.imgur.com/sUAPS2K.png)
+![UI EN](https://i.imgur.com/eMXv4w8.gif)
 
 >Thanks to [fibimeow222](https://x.com/fibimeow222) for the logo artwork.
 
@@ -86,7 +86,7 @@ Grab the **installer** from GitHub Releases (or the links below) and run it.
 
 Latest downloads:
 
-【[CPU build](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.1.0/v2.1.0_CPU.KHelperV2_Setup.exe)】【[GPU build](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.1.0/v2.1.0_GPU.KHelperV2_Setup.exe)】
+【[CPU build](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.2.0/v2.2.0_CPU.KHelperV2_Setup.exe)】【[GPU build](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.2.0/v2.2.0_GPU.KHelperV2_Setup.exe)】
 
 2. The installer will automatically:
 
@@ -124,7 +124,7 @@ Click “Change” at the top‑left to select a folder, so you can reliably pic
 
 On first use, open the top‑right **UVR Vocal Separation Tool** panel and click **Settings**. If you don’t want to tweak anything, simply click **Save** to initialize the **UVR separation settings** (you can start with the recommended model).
 
-Click **Choose File** to load an audio file → press **Separate** and wait (speed depends on CPU/GPU).
+Click “**Browse**” or turn on **YouTube Mode** to load/download the song audio → press **Separate** and wait (speed depends on CPU/GPU).
 
 3.  **Load audio**
 
@@ -205,6 +205,7 @@ Enable **LUFS Normalization** and set an appropriate target.
 -  **Python** and its ecosystem
 
 -  **NVIDIA CUDA/cuDNN** (when using GPU)
+- **yt-dlp** (YouTube video download)
 
 > Huge thanks to the projects and communities that made this tool possible.
 
@@ -269,7 +270,7 @@ Issues/feature requests: click **Report Issue** at the top‑left inside the app
 
   
 
-# v2.1.0 - 白狐のカラオケヘルパー v2 (KHelperV2)
+# v2.2.0 - 白狐のカラオケヘルパー v2 (KHelperV2)
 
 **配信者・歌手・VTuber** のための多機能オーディオツール。
 
@@ -285,9 +286,9 @@ Issues/feature requests: click **Report Issue** at the top‑left inside the app
 
 ----
 
-![Splash](https://i.imgur.com/0RWhoxL.png)
+![Splash](https://i.imgur.com/VQ1jLQT.png)
 
-![UI JA](https://i.imgur.com/4wOswVB.png)
+![UI JA](https://i.imgur.com/ctRlQy1.gif)
 
 >ロゴ制作は [fibimeow222](https://x.com/fibimeow222) さん、ありがとうございます。
 
@@ -349,7 +350,7 @@ GitHub Releases（または下記リンク）から **インストーラ** を�
 
 最新版ダウンロード：
 
-【[CPU版](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.1.0/v2.1.0_CPU.KHelperV2_Setup.exe)】【[GPU版](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.1.0/v2.1.0_GPU.KHelperV2_Setup.exe)】
+【[CPU版](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.21.0/v2.2.0_CPU.KHelperV2_Setup.exe)】【[GPU版](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.2.0/v2.2.0_GPU.KHelperV2_Setup.exe)】
 
 2. インストーラは自動で以下を行います：
 
@@ -387,7 +388,7 @@ GitHub Releases（または下記リンク）から **インストーラ** を�
 
 初回は右上の **「UVR ボーカル分離ツール」** パネルで **設定** を開き、細かい調整をしない場合は **保存** を押して **UVR分離設定** を初期化します（迷ったら推奨モデルでOK）。
 
-「**ファイルを選択**」で曲を読み込み → **分離** を押して完了を待ちます（速度はCPU/GPUに依存）。
+「**ファイルを選択**」をクリック、または **YouTube モード** を有効にして楽曲の音声を読み込み/ダウンロード → **分離** を押して完了を待ちます（速度は CPU/GPU に依存）。
 
 3.  **音声を読み込む**
 
@@ -468,6 +469,7 @@ GitHub Releases（または下記リンク）から **インストーラ** を�
 -  **Python** とそのエコシステム
 
 -  **NVIDIA CUDA/cuDNN**（GPU使用時）
+- **yt-dlp** (YouTubeビデオのダウンロード)
 
 > 本ツールは多くのプロジェクト/コミュニティの貢献に支えられています。感謝！
 
@@ -532,7 +534,7 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 
   
 
-# v2.1.0 - 白芙妮的伴唱小助手 v2 (KHelperV2)
+# v2.2.0 - 白芙妮的伴唱小助手 v2 (KHelperV2)
 
 为 **主播、歌手、VTuber** 打造的多功能音频工具。
 
@@ -548,9 +550,9 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 
 ----
 
-![Splash](https://i.imgur.com/0RWhoxL.png)
+![Splash](https://i.imgur.com/VQ1jLQT.png)
 
-![UI zhCN](https://i.imgur.com/43HlMp9.png)
+![UI zhCN](https://i.imgur.com/kJ7axrJ.gif)
 
 >感谢 [fibimeow222](https://x.com/fibimeow222) 设计的 Logo。
 
@@ -612,7 +614,7 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 
 最新版本下载：
 
-【[CPU 版下载](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.1.0/v2.1.0_CPU.KHelperV2_Setup.exe)】【[GPU 版下载](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.1.0/v2.1.0_GPU.KHelperV2_Setup.exe)】
+【[CPU 版下载](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.2.0/v2.2.0_CPU.KHelperV2_Setup.exe)】【[GPU 版下载](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.2.0/v2.2.0_GPU.KHelperV2_Setup.exe)】
 
 2. 安装器将自动：
 
@@ -648,7 +650,7 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 
 初次使用请先在右上方「UVR 人声分离工具」面板点击 **设置**；不想微调可直接点 **保存** 初始化 **UVR 分离设置**（不确定可先用推荐模型）。
 
-点击 **选择文件** 载入歌曲 → 按 **分离**，等待完成（速度取决于 CPU/显卡）。
+点击「**选择文件**」或打开 **YouTube 模式** 载入/下载歌曲音频 → 按 **分离**，等待完成（速度取决于 CPU/显卡）。
 
 3.  **载入音频**
 
@@ -729,6 +731,8 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 -  **Python** 及其生态
 
 -  **NVIDIA CUDA/cuDNN**（若使用 GPU）
+- **yt-dlp** (YouTube视频下载)
+
 
 > 感谢以上项目与社区的贡献，使本工具成为可能。
 
@@ -793,7 +797,7 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 
   
 
-# v2.1.0 - 白芙妮的伴唱小幫手 v2 (KHelperV2)
+# v2.2.0 - 白芙妮的伴唱小幫手 v2 (KHelperV2)
 
 專為 **實況主、歌手、VTuber** 打造的多功能音訊工具。
 
@@ -809,9 +813,9 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 
 ----
 
-![Splash](https://i.imgur.com/0RWhoxL.png)
+![Splash](https://i.imgur.com/VQ1jLQT.png)
 
-![UI zhTW](https://i.imgur.com/78tf8YC.png)
+![UI zhTW](https://i.imgur.com/z5TpZGv.gif)
 
 >感謝[菲比](https://x.com/fibimeow222)繪製的Logo圖
 
@@ -873,7 +877,7 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 
 最新版本下載連結：
 
-【[CPU版本下載連結](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.1.0/v2.1.0_CPU.KHelperV2_Setup.exe)】【[GPU版本下載連結](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.1.0/v2.1.0_GPU.KHelperV2_Setup.exe)】
+【[CPU版本下載連結](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.2.0/v2.2.0_CPU.KHelperV2_Setup.exe)】【[GPU版本下載連結](https://github.com/msfmsf777/karaoke-helper-v2/releases/download/v2.2.0/v2.2.0_GPU.KHelperV2_Setup.exe)】
 
 2. 安裝器會自動：
 
@@ -909,7 +913,7 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 
 首次使用請先在右上方「UVR 人聲分離工具」面板按 **設定**，若不願微調可以直接按「**儲存**」來初始化 **UVR 人聲分離設定**（不確定可先用推薦模型）。
 
-點擊「**選擇檔案**」載入歌曲音檔 → 按 **分離**，等待完成（速度取決於 CPU/顯卡）。
+點擊「**選擇檔案**」或打開 **YouTube 模式**載入/下載歌曲音檔 → 按 **分離**，等待完成（速度取決於 CPU/顯卡）。
 
 3.  **載入音檔**
 
@@ -990,6 +994,7 @@ X（旧Twitter）をフォローしてね！最新の楽しい情報を見逃さ
 -  **Python** 與相關生態
 
 -  **NVIDIA CUDA/cuDNN**（若使用 GPU）
+- **yt-dlp** (YouTube影片下載)
 
 > 感謝以上專案與社群的貢獻，讓本工具得以實現。
 

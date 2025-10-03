@@ -8,11 +8,14 @@ import sys
 import webbrowser
 import urllib.request
 import urllib.error
+import urllib.parse
+import tkinter.font as tkfont
 
-from ui_layout import create_layout, TooltipManager, CUSTOM_FONT_NAME
+from ui_layout import create_layout, TooltipManager, CUSTOM_FONT_NAME, EXPLORER_PANEL_WIDTH
 from audio_player import AudioPlayer
 from file_explorer import FileExplorer
 from vocal_separator import SidecarClient, get_recommended_model
+from youtube_fetcher import YTDownloader, DependencyError, DownloadCanceled
 import config_manager
 from i18n_helper import I18nManager
 
@@ -320,6 +323,7 @@ def main():
         i18n.t('window_title'),
         layout_with_menu,
         icon=window_icon,
+        # element_justification= 'left',
         finalize=True,
         resizable=True,
         size=(win_w, win_h)
@@ -370,7 +374,11 @@ def main():
 
     player = AudioPlayer(window, debug=True)
     explorer = FileExplorer()
+    yt_downloader = YTDownloader()
     listbox_items = []
+    listbox_display_items = []
+    listbox_truncated_map = {}
+    main_tooltip_manager = None
 
     # device id map
     device_map = {}
@@ -409,25 +417,32 @@ def main():
         config_manager.save_config(app_config)
 
     def populate_listbox():
-        nonlocal listbox_items
+        nonlocal listbox_items, listbox_display_items, listbox_truncated_map
         listbox_items.clear()
         subdirs, files = explorer.scan_folder(explorer.current_folder)
         for d in subdirs:
-            listbox_items.append(f"📁 {d}")
+            listbox_items.append('📁 ' + d)
         for f in files:
             listbox_items.append(f)
+        listbox_display_items.clear()
+        listbox_truncated_map.clear()
+        for idx, item_text in enumerate(listbox_items):
+            display_text, was_truncated = _truncate_display_text(item_text)
+            listbox_display_items.append(display_text)
+            if was_truncated:
+                listbox_truncated_map[idx] = item_text
         try:
-            window['-FILE_LIST-'].update(values=listbox_items)
+            window['-FILE_LIST-'].update(values=listbox_display_items)
         except Exception:
             pass
         colorize_listbox()
+        _cancel_row_tooltip()
 
     def colorize_listbox():
-        listbox_widget = window['-FILE_LIST-'].Widget
         for i, item_text in enumerate(listbox_items):
             try:
                 listbox_widget.itemconfig(i, bg='white', fg='black')
-                if item_text.startswith("📁"):
+                if _is_folder_entry(item_text):
                     listbox_widget.itemconfig(i, fg='#b28330')
                 elif item_text == explorer.instrumental_selection_name:
                     listbox_widget.itemconfig(i, bg='#a8d8ea')
@@ -445,32 +460,82 @@ def main():
                 pass
 
     listbox_widget = window['-FILE_LIST-'].Widget
+    listbox_font = tkfont.Font(font=listbox_widget.cget('font'))
+    explorer_text_max_px = max(120, EXPLORER_PANEL_WIDTH - 24)
+    ELLIPSIS = '\u2026'
     last_hover_index = None
+    current_tooltip_index = None
+    listbox_tooltip_after_id = None
     BASE_COLORS = {'instrumental': '#a8d8ea', 'vocal': '#f3c9d8', 'folder': 'white', 'default': 'white'}
     HOVER_COLORS = {'instrumental': '#cce8f4', 'vocal': '#fae3ea', 'folder': '#e0e0e0', 'default': '#e0e0e0'}
+
+    def _cancel_row_tooltip():
+        nonlocal listbox_tooltip_after_id, current_tooltip_index
+        if listbox_tooltip_after_id is not None and window.TKroot:
+            try:
+                window.TKroot.after_cancel(listbox_tooltip_after_id)
+            except Exception:
+                pass
+            listbox_tooltip_after_id = None
+        if current_tooltip_index is not None and main_tooltip_manager:
+            main_tooltip_manager.hide_immediate()
+            current_tooltip_index = None
+
+    def _truncate_display_text(text: str) -> tuple[str, bool]:
+        text = str(text)
+        if listbox_font.measure(text) <= explorer_text_max_px:
+            return text, False
+        low, high = 0, len(text)
+        best = ''
+        while low <= high:
+            mid = (low + high) // 2
+            candidate = text[:mid] + ELLIPSIS
+            if listbox_font.measure(candidate) <= explorer_text_max_px:
+                best = candidate
+                low = mid + 1
+            else:
+                high = mid - 1
+        if not best:
+            best = text[:1] + ELLIPSIS
+        return best, True
+
+    def _is_folder_entry(item_text: str) -> bool:
+        return item_text.startswith('\U0001f4c1') or item_text.startswith('??')
+
+    def _strip_folder_prefix(item_text: str) -> str:
+        if item_text.startswith('\U0001f4c1 '):
+            return item_text.split(' ', 1)[1] if ' ' in item_text else item_text
+        if item_text.startswith('?? '):
+            return item_text[3:] if len(item_text) > 3 else ''
+        return item_text
 
     def get_item_selection_type(index):
         if 0 <= index < len(listbox_items):
             item_text = listbox_items[index]
-            if item_text.startswith("📁"): return 'folder'
-            if item_text == explorer.instrumental_selection_name: return 'instrumental'
-            if item_text == explorer.vocal_selection_name: return 'vocal'
+            if _is_folder_entry(item_text):
+                return 'folder'
+            if item_text == explorer.instrumental_selection_name:
+                return 'instrumental'
+            if item_text == explorer.vocal_selection_name:
+                return 'vocal'
         return 'default'
 
     listbox_widget.configure(selectborderwidth=0, activestyle='none', exportselection=0)
 
     def motion_handler(event):
-        nonlocal last_hover_index
+        nonlocal last_hover_index, current_tooltip_index, listbox_tooltip_after_id
         try:
             if player.playing or separating:
-                return "break"
+                _cancel_row_tooltip()
+                return 'break'
             potential_index = listbox_widget.index(f"@{event.x},{event.y}")
             bbox = listbox_widget.bbox(potential_index)
             current_index = potential_index if bbox and (bbox[1] <= event.y < bbox[1] + bbox[3]) else None
         except Exception:
             current_index = None
         if current_index is None:
-            if last_hover_index is not None: leave_handler(None)
+            if last_hover_index is not None:
+                leave_handler(None)
             return
         if current_index != last_hover_index:
             if last_hover_index is not None:
@@ -480,12 +545,30 @@ def main():
                     listbox_widget.itemconfig(last_hover_index, bg=base_color)
                 except Exception:
                     pass
+            _cancel_row_tooltip()
             selection_type = get_item_selection_type(current_index)
             hover_color = HOVER_COLORS[selection_type]
             try:
                 listbox_widget.itemconfig(current_index, bg=hover_color)
             except Exception:
                 pass
+            tooltip_text = listbox_truncated_map.get(current_index)
+            if tooltip_text and window.TKroot:
+                bbox = listbox_widget.bbox(current_index)
+                dy_offset = (bbox[1] + min(bbox[3] + 12, 48)) if bbox else 25
+                current_tooltip_index = current_index
+
+                def _show_tooltip(idx=current_index, tip=tooltip_text, dy=dy_offset):
+                    nonlocal listbox_tooltip_after_id, current_tooltip_index
+                    if current_tooltip_index != idx:
+                        return
+                    if main_tooltip_manager:
+                        main_tooltip_manager.show_immediate(listbox_widget, tip, dx=30, dy=dy)
+                    listbox_tooltip_after_id = None
+
+                listbox_tooltip_after_id = window.TKroot.after(500, _show_tooltip)
+            else:
+                current_tooltip_index = None
             last_hover_index = current_index
 
     def leave_handler(event):
@@ -498,23 +581,27 @@ def main():
             except Exception:
                 pass
         last_hover_index = None
+        _cancel_row_tooltip()
 
     def right_click_handler(event):
         try:
             if player.playing or separating:
-                return "break"
+                return 'break'
+            _cancel_row_tooltip()
             clicked_index = listbox_widget.index(f"@{event.x},{event.y}")
             bbox = listbox_widget.bbox(clicked_index)
             if bbox and (bbox[1] <= event.y < bbox[1] + bbox[3]) and 0 <= clicked_index < len(listbox_items):
                 window.write_event_value('-RIGHT_CLICK-', clicked_index)
         except Exception:
             pass
-        return "break"
+        return 'break'
 
     def left_click_handler(event):
+        nonlocal current_tooltip_index
         try:
             if player.playing or separating:
-                return "break"
+                return 'break'
+            _cancel_row_tooltip()
             clicked_index = listbox_widget.index(f"@{event.x},{event.y}")
             bbox = listbox_widget.bbox(clicked_index)
             if bbox and (bbox[1] <= event.y < bbox[1] + bbox[3]) and 0 <= clicked_index < len(listbox_items):
@@ -524,7 +611,7 @@ def main():
                 colorize_listbox()
         except Exception:
             pass
-        return "break"
+        return 'break'
 
     listbox_widget.bind('<Motion>', motion_handler)
     listbox_widget.bind('<Leave>', leave_handler)
@@ -543,6 +630,10 @@ def main():
         pass
     try:
         main_tooltip_manager.bind(window['-PLAYER_INFO-'].Widget, i18n.t('player_info_tooltip'))
+    except Exception:
+        pass
+    try:
+        main_tooltip_manager.bind(window['-YT_INFO-'].Widget, i18n.t('ui.youtube.tooltip'))
     except Exception:
         pass
     try:
@@ -581,6 +672,12 @@ def main():
     separating = False
     sep_out_dir = None
     last_overall_display = 0   # [MONO] total progress will never go backwards
+    yt_job_active = False
+    yt_job_type = None
+    yt_last_download_pct = 0
+    yt_blend_active = False
+    yt_current_status = None
+    yt_pending_clear = False
 
     set_msg_expire_at = 0
     device_scan_msg_expire_at = 0
@@ -809,6 +906,50 @@ def main():
         try:
             window['-SET_MSG-'].update(text, text_color=color)
             set_msg_expire_at = time.time() + seconds
+        except Exception:
+            pass
+
+    def validate_youtube_url(url: str) -> bool:
+        if not url:
+            return False
+        url = url.strip()
+        try:
+            parsed = urllib.parse.urlparse(url)
+        except Exception:
+            return False
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        host = (parsed.netloc or '').lower()
+        path = parsed.path or ''
+        if host.endswith('youtube.com'):
+            if not path.lower().startswith('/watch'):
+                return False
+            query = urllib.parse.parse_qs(parsed.query or '')
+            video_ids = [v for v in query.get('v', []) if v]
+            return bool(video_ids)
+        if 'youtu.be' in host:
+            slug = path.strip('/')
+            return bool(slug)
+        return False
+
+    def get_default_youtube_dir() -> str:
+        home = os.path.expanduser('~')
+        music_dir = os.path.join(home, 'Music')
+        return os.path.join(music_dir, 'KHelperV2', 'YouTube')
+
+    def set_yt_controls_enabled(enabled: bool) -> None:
+        base_enabled = bool(enabled)
+        effective = base_enabled and not player.playing and not separating
+        keys = ('-YT_DL_ONLY-', '-YT_DL_SEP-', '-YT_MODE-')
+        for key in keys:
+            try:
+                if key in window.AllKeysDict:
+                    window[key].update(disabled=not effective)
+            except Exception:
+                pass
+        try:
+            if '-YT_URL-' in window.AllKeysDict:
+                window['-YT_URL-'].update(disabled=not effective)
         except Exception:
             pass
 
@@ -1057,10 +1198,15 @@ def main():
         '-OPEN_FOLDER-': 'open_folder_button',
         '-REFRESH-': 'refresh_button',
         'vocal_separator_title': 'vocal_separator_title',
+        '-YT_MODE-': 'ui.youtube.toggle',
+        '-YT_LABEL-': 'ui.youtube.toggle',
         '-SEP_GPU_STATUS-': 'gpu_status_checking',
         'song_file_label': 'song_file_label',
+        '-YT_URL_LABEL-': 'ui.youtube.url_label',
         '-SONG_FILE_BROWSE-': 'browse_file_button',
         '-START_SEPARATION-': 'start_separation_button',
+        '-YT_DL_ONLY-': 'ui.youtube.fetch_only',
+        '-YT_DL_SEP-': 'ui.youtube.fetch_and_sep',
         '-OPEN_SEPARATOR_SETTINGS-': 'separator_settings_button',
         '-SEPARATOR_STATUS-': 'separator_status_ready',
         'audio_loader_title': 'audio_loader_title',
@@ -1108,6 +1254,8 @@ def main():
                         # Determine Play/Pause text based on playing state
                         text_key = 'pause_button' if player.playing else 'play_button'
                         window[widget_key].update(i18n.t(text_key))
+                    elif widget_key == '-YT_MODE-':
+                        window[widget_key].update(text=i18n.t(trans_key))
                     else:
                         window[widget_key].update(i18n.t(trans_key))
             except Exception:
@@ -1122,6 +1270,10 @@ def main():
             pass
         try:
             main_tooltip_manager.bind(window['-PLAYER_INFO-'].Widget, i18n.t('player_info_tooltip'))
+        except Exception:
+            pass
+        try:
+            main_tooltip_manager.bind(window['-YT_INFO-'].Widget, i18n.t('ui.youtube.tooltip'))
         except Exception:
             pass
         try:
@@ -1293,6 +1445,19 @@ def main():
                 except Exception:
                     pass
 
+        if event == '-YT_MODE-':
+            yt_enabled = bool(values.get('-YT_MODE-'))
+            try:
+                window['-FILE_ROW-'].update(visible=not yt_enabled)
+                window['-FILE_BUTTONS-'].update(visible=not yt_enabled)
+                window['-YT_ROW-'].update(visible=yt_enabled)
+                window['-YT_BUTTONS-'].update(visible=yt_enabled)
+                if '-YT_TERMINATE-' in window.AllKeysDict:
+                    window['-YT_TERMINATE-'].update(visible=yt_job_active and yt_enabled, disabled=player.playing)
+            except Exception:
+                pass
+            set_yt_controls_enabled(not yt_job_active)
+
         if event == '-PLAYER_DEBUG-':
             print("[PLAYER_DEBUG]", values[event])
 
@@ -1325,15 +1490,34 @@ def main():
                 window['-DEVICE_SCAN_STATUS-'].update(i18n.t('refresh_success'), text_color='lightgreen')
                 update_device_list(new_device_info)
 
+        if event == '-YT_TERMINATE-':
+            yt_pending_clear = False
+            if yt_downloader.is_downloading():
+                try:
+                    window['-YT_TERMINATE-'].update(disabled=True)
+                except Exception:
+                    pass
+                yt_downloader.cancel()
+            elif separating:
+                window.write_event_value('-START_SEPARATION-', {'terminate_via_yt': True})
+            continue
+
         if event in ("-LEFT_CLICK-", "-FILE_LIST-"):
             if player.playing or separating:
                 continue
-            idx = values.get(event)
-            if isinstance(idx, list): idx = idx[0]
+            _cancel_row_tooltip()
+            if event == "-FILE_LIST-":
+                selection = listbox_widget.curselection()
+                idx = selection[0] if selection else None
+            else:
+                idx = values.get(event)
+            if isinstance(idx, list):
+                idx = idx[0]
             if isinstance(idx, int) and 0 <= idx < len(listbox_items):
                 selected = listbox_items[idx]
-                if selected.startswith("📁"):
-                    change_directory(os.path.join(explorer.current_folder, selected.replace("📁 ", "")))
+                if _is_folder_entry(selected):
+                    folder_name = _strip_folder_prefix(selected)
+                    change_directory(os.path.join(explorer.current_folder, folder_name))
                 else:
                     explorer.set_instrumental(selected)
                     window['-INSTRUMENTAL_DISPLAY-'].update(explorer.instrumental_selection_name or i18n.t('instrumental_display_placeholder'))
@@ -1348,7 +1532,7 @@ def main():
             idx = values.get(event)
             if isinstance(idx, int) and 0 <= idx < len(listbox_items):
                 selected = listbox_items[idx]
-                if not selected.startswith("📁"):
+                if not _is_folder_entry(selected):
                     explorer.set_vocal(selected)
                     window['-INSTRUMENTAL_DISPLAY-'].update(explorer.instrumental_selection_name or i18n.t('instrumental_display_placeholder'))
                     window['-VOCAL_DISPLAY-'].update(explorer.vocal_selection_name or i18n.t('vocal_display_placeholder'))
@@ -1356,11 +1540,328 @@ def main():
                     colorize_listbox()
                     handle_input_change()
 
+        if event in ("-YT_DL_ONLY-", "-YT_DL_SEP-"):
+            if yt_job_active or separating:
+                continue
+            url_value = (values.get('-YT_URL-') or '').strip()
+            if not validate_youtube_url(url_value):
+                show_setting_message(i18n.t('errors.youtube.invalid'), 3.0, color='red')
+                yt_pending_clear = False
+                continue
+            chosen_folder = explorer.current_folder if explorer.current_folder and os.path.isdir(explorer.current_folder) else None
+            if chosen_folder:
+                out_dir = chosen_folder
+            else:
+                out_dir = get_default_youtube_dir()
+                try:
+                    os.makedirs(out_dir, exist_ok=True)
+                except Exception:
+                    show_setting_message(i18n.t('cannot_open_folder_msg'), 4.0, color='red')
+                    yt_pending_clear = False
+                    continue
+                try:
+                    change_directory(out_dir)
+                except Exception:
+                    explorer.set_current_folder(out_dir)
+            try:
+                sr_value = values.get('-SAMPLE_RATE-')
+                target_sr = int(str(sr_value))
+            except Exception:
+                target_sr = 44100
+            if target_sr <= 0:
+                target_sr = 44100
+            job_type = 'download' if event == '-YT_DL_ONLY-' else 'download_sep'
+            yt_job_active = True
+            yt_job_type = job_type
+            yt_last_download_pct = 0
+            yt_current_status = 'fetching'
+            yt_blend_active = (job_type == 'download_sep')
+            yt_pending_clear = True
+            last_overall_display = 0
+            try:
+                window['-YT_DL_ONLY-'].update(visible=False, disabled=True)
+                window['-YT_DL_SEP-'].update(visible=False, disabled=True)
+                window['-YT_TERMINATE-'].update(visible=True, disabled=False)
+            except Exception:
+                pass
+            try:
+                window['-OPEN_SEPARATOR_SETTINGS-'].update(disabled=True)
+            except Exception:
+                pass
+            set_yt_controls_enabled(False)
+            try:
+                window['-SET_MSG-'].update("")
+                window['-SEP_TOTAL_PROGRESS-'].update(0, visible=True)
+                window['-SEP_TOTAL_PERCENT-'].update("0%", visible=True)
+                window['-SEPARATOR_STATUS-'].update(f"{i18n.t('status.youtube.fetching')} 0%")
+            except Exception:
+                pass
+
+            def _run_yt_download(target_url=url_value, dst_dir=out_dir, sr=target_sr, job=job_type):
+                last_status = 'fetching'
+                try:
+                    def _on_progress(pct):
+                        try:
+                            window.write_event_value('-YT_PROGRESS-', {'job': job, 'percent': int(max(0, min(100, pct)))})
+                        except Exception:
+                            pass
+                    def _on_log(line):
+                        nonlocal last_status
+                        lowered = (line or '').lower()
+                        status = None
+                        if 'extractaudio' in lowered or 'destination:' in lowered or 'ffmpeg' in lowered:
+                            status = 'converting'
+                        if status and status != last_status:
+                            last_status = status
+                            try:
+                                window.write_event_value('-YT_PROGRESS-', {'job': job, 'status': status})
+                            except Exception:
+                                pass
+                    wav_path = yt_downloader.download_best_audio_to_wav(target_url, dst_dir, sr, _on_progress, _on_log)
+                    try:
+                        window.write_event_value('-YT_PROGRESS-', {'job': job, 'percent': 100, 'status': 'done'})
+                        window.write_event_value('-YT_COMPLETE-', {'job': job, 'path': wav_path, 'output_dir': dst_dir})
+                    except Exception:
+                        pass
+                except DependencyError as dep_err:
+                    dep_name = getattr(dep_err, 'dependency', None) or (dep_err.args[0] if dep_err.args else '')
+                    try:
+                        window.write_event_value('-YT_ERROR-', {'job': job, 'code': dep_name})
+                    except Exception:
+                        pass
+                except DownloadCanceled:
+                    try:
+                        window.write_event_value('-YT_ERROR-', {'job': job, 'canceled': True})
+                    except Exception:
+                        pass
+                except Exception as ex:
+                    try:
+                        window.write_event_value('-YT_ERROR-', {'job': job, 'error': str(ex)})
+                    except Exception:
+                        pass
+
+            threading.Thread(target=_run_yt_download, daemon=True).start()
+
+
+        if event == "-YT_PROGRESS-":
+            payload = values.get('-YT_PROGRESS-')
+            if not isinstance(payload, dict):
+                payload = {}
+            job = payload.get('job') or yt_job_type
+            if yt_job_type and job and job != yt_job_type:
+                continue
+            status_key = payload.get('status')
+            percent = payload.get('percent')
+            if percent is not None:
+                try:
+                    percent = int(percent)
+                except Exception:
+                    percent = None
+            if percent is not None:
+                percent = max(0, min(100, percent))
+                yt_last_download_pct = percent
+                if yt_job_type == 'download_sep':
+                    overall = round(0.30 * yt_last_download_pct)
+                    overall = max(0, min(30, overall))
+                else:
+                    overall = percent
+                try:
+                    window['-SEP_TOTAL_PROGRESS-'].update(overall, visible=True)
+                    window['-SEP_TOTAL_PERCENT-'].update(f"{overall}%", visible=True)
+                except Exception:
+                    pass
+                last_overall_display = max(last_overall_display, overall)
+            if status_key:
+                yt_current_status = status_key
+            elif yt_current_status is None:
+                yt_current_status = 'fetching'
+            display_status = yt_current_status or 'fetching'
+            if status_key or percent is not None:
+                status_label = f"status.youtube.{display_status}"
+                status_text = i18n.t(status_label)
+                display_pct = yt_last_download_pct
+                try:
+                    window['-SEPARATOR_STATUS-'].update(f"{status_text} {display_pct}%")
+                except Exception:
+                    pass
+
+        if event == "-YT_COMPLETE-":
+            payload = values.get('-YT_COMPLETE-')
+            if not isinstance(payload, dict):
+                payload = {}
+            job = payload.get('job') or yt_job_type
+            path = payload.get('path')
+            out_dir = payload.get('output_dir')
+            yt_job_active = (job == 'download_sep')
+            yt_last_download_pct = 100
+            yt_current_status = 'done'
+            if job == 'download_sep':
+                baseline = min(30, round(0.30 * yt_last_download_pct))
+                last_overall_display = max(last_overall_display, baseline)
+                try:
+                    window['-SEP_TOTAL_PROGRESS-'].update(baseline, visible=True)
+                    window['-SEP_TOTAL_PERCENT-'].update(f"{baseline}%", visible=True)
+                except Exception:
+                    pass
+            else:
+                try:
+                    window['-SEP_TOTAL_PROGRESS-'].update(100, visible=True)
+                    window['-SEP_TOTAL_PERCENT-'].update("100%", visible=True)
+                except Exception:
+                    pass
+            try:
+                window['-SEPARATOR_STATUS-'].update(f"{i18n.t('status.youtube.done')} 100%")
+            except Exception:
+                pass
+            refresh_dir = None
+            if isinstance(out_dir, str):
+                refresh_dir = os.path.normpath(out_dir)
+            if refresh_dir:
+                try:
+                    current_dir = explorer.current_folder
+                    if current_dir and os.path.isdir(refresh_dir):
+                        cur_norm = os.path.normcase(os.path.normpath(current_dir))
+                        ref_norm = os.path.normcase(refresh_dir)
+                        if cur_norm == ref_norm:
+                            populate_listbox()
+                            threading.Timer(0.6, lambda: window.write_event_value('-DELAYED_POPULATE-', True)).start()
+                except Exception:
+                    pass
+            if job == 'download':
+                show_setting_message(i18n.t('status.youtube.done'), 3.0, color='lightgreen')
+                yt_blend_active = False
+                yt_job_type = None
+                yt_current_status = None
+                yt_last_download_pct = 0
+                if yt_pending_clear and values.get('-YT_MODE-'):
+                    try:
+                        window['-YT_URL-'].update("")
+                    except Exception:
+                        pass
+                yt_pending_clear = False
+                set_yt_controls_enabled(True)
+                last_overall_display = 0
+                try:
+                    window['-SEP_TOTAL_PROGRESS-'].update(visible=False)
+                    window['-SEP_TOTAL_PERCENT-'].update("", visible=False)
+                except Exception:
+                    pass
+                try:
+                    window['-SEPARATOR_STATUS-'].update(i18n.t('separator_status_ready'))
+                except Exception:
+                    pass
+                if not player.playing and not separating:
+                    try:
+                        window['-OPEN_SEPARATOR_SETTINGS-'].update(disabled=False)
+                    except Exception:
+                        pass
+                try:
+                    window['-YT_DL_ONLY-'].update(visible=True, disabled=False)
+                    window['-YT_DL_SEP-'].update(visible=True, disabled=False)
+                    window['-YT_TERMINATE-'].update(visible=False, disabled=False)
+                except Exception:
+                    pass
+                if path:
+                    try:
+                        window['-SONG_FILE-'].update(path)
+                    except Exception:
+                        pass
+                    handle_input_change()
+            else:
+                if not path:
+                    show_setting_message(i18n.t('error_message'), 3.0, color='red')
+                    yt_blend_active = False
+                    yt_job_type = None
+                    yt_current_status = None
+                    yt_job_active = False
+                    yt_pending_clear = False
+                    set_yt_controls_enabled(True)
+                    try:
+                        window['-YT_DL_ONLY-'].update(visible=True, disabled=False)
+                        window['-YT_DL_SEP-'].update(visible=True, disabled=False)
+                        window['-YT_TERMINATE-'].update(visible=False, disabled=False)
+                    except Exception:
+                        pass
+                    if not separating and not player.playing:
+                        try:
+                            window['-OPEN_SEPARATOR_SETTINGS-'].update(disabled=False)
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        window['-YT_TERMINATE-'].update(visible=True, disabled=False)
+                    except Exception:
+                        pass
+                    try:
+                        window['-SONG_FILE-'].update(path)
+                    except Exception:
+                        pass
+                    handle_input_change()
+                    window.write_event_value('-START_SEPARATION-', {'auto': True, 'path': path})
+            set_yt_controls_enabled(not yt_job_active)
+
+        if event == "-YT_ERROR-":
+            payload = values.get('-YT_ERROR-')
+            if not isinstance(payload, dict):
+                payload = {}
+            canceled = bool(payload.get('canceled'))
+            yt_job_active = False
+            yt_blend_active = False
+            yt_job_type = None
+            yt_current_status = None
+            yt_last_download_pct = 0
+            yt_pending_clear = False
+            last_overall_display = 0
+            set_yt_controls_enabled(True)
+            try:
+                window['-YT_DL_ONLY-'].update(visible=True, disabled=False)
+                window['-YT_DL_SEP-'].update(visible=True, disabled=False)
+                window['-YT_TERMINATE-'].update(visible=False, disabled=False)
+            except Exception:
+                pass
+            if not separating and not player.playing:
+                try:
+                    window['-OPEN_SEPARATOR_SETTINGS-'].update(disabled=False)
+                except Exception:
+                    pass
+            try:
+                window['-SEP_TOTAL_PROGRESS-'].update(0, visible=False)
+                window['-SEP_TOTAL_PERCENT-'].update("", visible=False)
+            except Exception:
+                pass
+            err_code = (payload.get('code') or '').lower()
+            err_message = payload.get('error')
+            message = None
+            if canceled:
+                message = i18n.t('canceled_message')
+            elif 'ytdlp' in err_code or 'yt-dlp' in err_code or 'yt_dlp' in err_code:
+                message = i18n.t('errors.ytdlp.missing')
+            elif 'ffmpeg' in err_code:
+                message = i18n.t('errors.ffmpeg.missing')
+            else:
+                message = err_message or i18n.t('error_message')
+            show_setting_message(message, 4.0 if not canceled else 3.0, color='red')
+            if not separating:
+                try:
+                    window['-SEPARATOR_STATUS-'].update(i18n.t('separator_status_ready'))
+                except Exception:
+                    pass
+            continue
+
         if event == "-OPEN_SEPARATOR_SETTINGS-":
             open_separator_settings_modal(default_folder=explorer.current_folder)
 
         # ------------------- Start/Abort separation using sidecar -------------------
         if event == "-START_SEPARATION-":
+            payload_auto = values.get('-START_SEPARATION-')
+            auto_data = payload_auto if isinstance(payload_auto, dict) else {}
+            auto_path = auto_data.get('path')
+            if auto_path:
+                try:
+                    window['-SONG_FILE-'].update(auto_path)
+                except Exception:
+                    pass
+                values['-SONG_FILE-'] = auto_path
             if not separating and not player.playing:
                 chosen = app_config.get("separator_settings") or {}
                 for k, v in DEFAULT_SEPARATOR_SETTINGS.items():
@@ -1370,29 +1871,41 @@ def main():
                 if not chosen:
                     continue
 
-                input_file = values["-SONG_FILE-"]
+                input_file = auto_path or values.get("-SONG_FILE-")
                 if not input_file or not os.path.exists(input_file):
-                    show_error_dialog(i18n.t('error_message'), i18n.t('file_not_found_msg'), "")
+                    show_setting_message(i18n.t('file_not_found_msg'), 3.0, color='red')
+                    if not separating:
+                        try:
+                            window['-SEPARATOR_STATUS-'].update(i18n.t('separator_status_ready'))
+                        except Exception:
+                            pass
                     continue
 
                 sep_out_dir = explorer.current_folder if chosen.get("save_to_explorer", False) else (chosen.get("output_dir") or os.path.dirname(input_file))
                 try:
                     os.makedirs(sep_out_dir, exist_ok=True)
                 except Exception as e:
-                    if sep_out_dir is None:
-                        show_error_dialog(i18n.t('error_message'), i18n.t('select_valid_folder_msg'), f"\n{e}")
-                    else:
-                        show_error_dialog(i18n.t('error_message'), i18n.t('cannot_open_folder_msg'), f"{sep_out_dir}\n\n{e}")
+                    message_key = 'select_valid_folder_msg' if sep_out_dir is None else 'cannot_open_folder_msg'
+                    show_setting_message(i18n.t(message_key), 4.0, color='red')
+                    if not separating:
+                        try:
+                            window['-SEPARATOR_STATUS-'].update(i18n.t('separator_status_ready'))
+                        except Exception:
+                            pass
                     continue
 
                 # GUI state
                 separating = True
                 window['-START_SEPARATION-'].update(i18n.t('stop_separation_button'))
                 # ---- A) SHOW the total progress UI at job start ----
-                window['-SEP_TOTAL_PROGRESS-'].update(0, visible=True)
-                window['-SEP_TOTAL_PERCENT-'].update("0%", visible=True)
+                baseline_overall = 0
+                if yt_blend_active and yt_last_download_pct:
+                    baseline_overall = min(30, round(0.30 * yt_last_download_pct))
+                window['-SEP_TOTAL_PROGRESS-'].update(baseline_overall, visible=True)
+                window['-SEP_TOTAL_PERCENT-'].update(f"{baseline_overall}%", visible=True)
                 window['-SEPARATOR_STATUS-'].update(i18n.t('gpu_status_checking'))
-                last_overall_display = 0  # [MONO] reset high-water mark on job start
+                last_overall_display = max(last_overall_display, baseline_overall)
+                yt_current_status = None
 
                 sep_worker = sidecar_client  # minimal change: keep variable name
 
@@ -1473,13 +1986,34 @@ def main():
                     except Exception:
                         pass
                 separating = False
+                yt_job_active = False
+                yt_blend_active = False
+                yt_job_type = None
+                yt_last_download_pct = 0
+                yt_current_status = None
+                yt_pending_clear = False
                 window['-START_SEPARATION-'].update(i18n.t('start_separation_button'))
                 show_setting_message(i18n.t('canceled_message'), 3.0, color="red")
-                window['-SEPARATOR_STATUS-'].update(i18n.t('separator_status_ready'))
+                try:
+                    window['-SEPARATOR_STATUS-'].update(i18n.t('separator_status_ready'))
+                except Exception:
+                    pass
                 last_overall_display = 0  # reset
                 # ensure UI returns to hidden/cleared state on cancel from button
                 window['-SEP_TOTAL_PROGRESS-'].update(0, visible=False)
                 window['-SEP_TOTAL_PERCENT-'].update("", visible=False)
+                set_yt_controls_enabled(True)
+                try:
+                    window['-YT_DL_ONLY-'].update(visible=True, disabled=False)
+                    window['-YT_DL_SEP-'].update(visible=True, disabled=False)
+                    window['-YT_TERMINATE-'].update(visible=False, disabled=False)
+                except Exception:
+                    pass
+                if not player.playing:
+                    try:
+                        window['-OPEN_SEPARATOR_SETTINGS-'].update(disabled=False)
+                    except Exception:
+                        pass
 
         # ------------------- Handle sidecar-progress UI updates ---------------------
         if event == "-SEPARATION_PROGRESS-":
@@ -1490,7 +2024,13 @@ def main():
                 stage = payload.get("stage", "")
                 stage_pct = int(payload.get("stage_pct", payload.get("pct", 0)))
 
-                overall_disp = max(overall_in, last_overall_display)
+                if yt_blend_active:
+                    sep_overall_pct = max(0, min(100, overall_in))
+                    blended = round(0.30 * yt_last_download_pct + 0.70 * sep_overall_pct)
+                    blended = max(0, min(100, blended))
+                    overall_disp = max(blended, last_overall_display)
+                else:
+                    overall_disp = max(overall_in, last_overall_display)
                 last_overall_display = overall_disp
 
                 if separating:
@@ -1516,7 +2056,31 @@ def main():
             elif ptype == "done":
                 files = payload.get("files", [])
                 separating = False
+                yt_job_active = False
+                yt_blend_active = False
+                yt_job_type = None
+                yt_last_download_pct = 0
+                yt_current_status = None
+                set_yt_controls_enabled(True)
+                should_clear_url = yt_pending_clear
+                yt_pending_clear = False
                 window['-START_SEPARATION-'].update(i18n.t('start_separation_button'))
+                try:
+                    window['-YT_DL_ONLY-'].update(visible=True, disabled=False)
+                    window['-YT_DL_SEP-'].update(visible=True, disabled=False)
+                    window['-YT_TERMINATE-'].update(visible=False, disabled=False)
+                except Exception:
+                    pass
+                if not player.playing:
+                    try:
+                        window['-OPEN_SEPARATOR_SETTINGS-'].update(disabled=False)
+                    except Exception:
+                        pass
+                if should_clear_url and values.get('-YT_MODE-'):
+                    try:
+                        window['-YT_URL-'].update("")
+                    except Exception:
+                        pass
                 last_overall_display = 100
                 try:
                     window['-SEP_TOTAL_PROGRESS-'].update(100)
@@ -1552,6 +2116,24 @@ def main():
 
             elif ptype in ("aborted", "error"):
                 separating = False
+                yt_job_active = False
+                yt_blend_active = False
+                yt_job_type = None
+                yt_last_download_pct = 0
+                yt_current_status = None
+                yt_pending_clear = False
+                set_yt_controls_enabled(True)
+                try:
+                    window['-YT_DL_ONLY-'].update(visible=True, disabled=False)
+                    window['-YT_DL_SEP-'].update(visible=True, disabled=False)
+                    window['-YT_TERMINATE-'].update(visible=False, disabled=False)
+                except Exception:
+                    pass
+                if not player.playing:
+                    try:
+                        window['-OPEN_SEPARATOR_SETTINGS-'].update(disabled=False)
+                    except Exception:
+                        pass
                 window['-START_SEPARATION-'].update(i18n.t('start_separation_button'))
                 window['-SEPARATOR_STATUS-'].update(i18n.t('separator_status_ready') if ptype == "aborted" else i18n.t('error_message'))
                 last_overall_display = 0
@@ -1671,6 +2253,13 @@ def main():
 
         can_load = bool(explorer.instrumental_path and explorer.vocal_path and not is_busy and not player.audio_loaded)
         window['-LOAD-'].update(disabled=not can_load)
+
+        set_yt_controls_enabled(not yt_job_active)
+        try:
+            if '-YT_TERMINATE-' in window.AllKeysDict:
+                window['-YT_TERMINATE-'].update(disabled=player.playing)
+        except Exception:
+            pass
 
         if event in ("-HEADPHONE-", "-VIRTUAL-"):
             key_name = 'last_headphone' if event == "-HEADPHONE-" else 'last_virtual'

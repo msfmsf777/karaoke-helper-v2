@@ -1,6 +1,5 @@
 {
   "language_name": "繁體中文",
-  
   "window_title": "白芙妮的伴唱小幫手 v2",
   "splash_loading": "加載中",
   "menu_help": "幫助",
@@ -13,7 +12,6 @@
   "restart_prompt": "切換語言需要重新啟動應用程式。是否現在重新啟動？",
   "restart_now": "立即重新啟動",
   "restart_later": "稍後",
-
   "file_explorer_title": "📁 檔案總管",
   "file_explorer_tooltip": "檔案總管說明",
   "folder_path_placeholder": "(尚未選擇資料夾)",
@@ -21,8 +19,8 @@
   "back_button": "◀",
   "left_click_choose_instrumental": "左鍵: 選擇伴奏",
   "right_click_choose_vocal": "右鍵: 選擇人聲",
-  "open_folder_button": "打開資料夾",
-  "refresh_button": "重新整理",
+  "open_folder_button": "📂",
+  "refresh_button": "⟳",
   "vocal_separator_title": "🎤 UVR人聲分離工具",
   "gpu_status_checking": "GPU加速檢測中",
   "song_file_label": "歌曲檔案:",
@@ -38,6 +36,18 @@
   "stage_separating": "分離中",
   "stage_finalize": "完成處理",
   "total_progress_label": "總進度:",
+  "ui.youtube.toggle": "YouTube 模式",
+  "ui.youtube.url_label": "YouTube 連結：",
+  "ui.youtube.fetch_only": "僅下載",
+  "ui.youtube.fetch_and_sep": "下載並分離",
+  "ui.youtube.tooltip": "輸入 YouTube 影片連結以擷取音訊（.wav）。請確認你有權限擷取該內容。",
+  "status.youtube.fetching": "正在擷取音訊",
+  "status.youtube.converting": "正在轉換音訊",
+  "status.youtube.done": "下載完成",
+  "errors.youtube.invalid": "連結無效",
+  "errors.ytdlp.missing": "找不到 yt-dlp。請將 yt-dlp.exe 放在程式同目錄，或加入 PATH。",
+  "errors.ffmpeg.missing": "找不到 FFmpeg。請確認 ffmpeg\\bin 中有 ffmpeg.exe，或已加入 PATH。",
+
   "audio_loader_title": "♪ 音訊加載器",
   "audio_loader_tooltip": "音訊加載器說明",
   "instrumental_label": "伴奏:",
@@ -68,8 +78,8 @@
   "pause_button": "⏸ 暫停",
   "forward_button": "5秒 >>",
   "stop_button": "⏹ 停止",
-  "instrumental_volume_label": "伴奏 🔊 ",
-  "vocal_volume_label": "人聲音量 🔊 ",
+  "instrumental_volume_label": "伴奏",
+  "vocal_volume_label": "人聲音量",
   "audio_files": "音訊檔案",
   "explorer_info_tooltip": "檔案總管只顯示常見音訊格式（例如 wav, mp3, flac, m4a, aac, ogg, opus, wma）。某些編碼或損壞的檔案可能無法顯示。",
   "player_info_tooltip": "為獲得最佳品質，請確保伴奏與人聲檔案的采樣率/長度相符，且兩檔案已對齊（同步）。",
@@ -128,7 +138,6 @@
   "about_title": "關於",
   "about_text": "直播唱歌需要伴唱但又不想讓觀衆聽到原唱人聲？那這就是爲尼專門打造的小程式~\n本程式整合了高品質AI人聲分離、雙軌播放器、升降Key、音量標準化等多項強大功能!",
   "about_subtext": "窩的第一個程式可能有Bug，歡迎追隨我/回饋使用體驗~",
-  "twitter_portal": "推特傳送門"
-  ,
+  "twitter_portal": "推特傳送門",
   "copy_to_clipboard_failed": "複製到剪貼簿可能失敗"
 }

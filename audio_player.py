@@ -48,6 +48,7 @@ class AudioPlayer:
         self.instrumental_volume = 0.7
         self.vocal_volume = 1.0
         self.last_error = ""
+        self._seek_in_progress = False
 
         # Seeking/debounce helpers
         self._seek_lock = threading.Lock()
@@ -337,24 +338,30 @@ class AudioPlayer:
             outdata.fill(0)
             raise sd.CallbackStop
 
-    def _close_streams(self):
+    def _close_streams(self, *, mark_stopped=True):
+        hp_stream = None
+        vp_stream = None
         with self._stream_lock:
-            if self.headphone_stream:
-                try: self.headphone_stream.stop()
-                except Exception: pass
-                try: self.headphone_stream.close()
-                except Exception: pass
-                self.headphone_stream = None
+            hp_stream = self.headphone_stream
+            vp_stream = self.virtual_stream
+            self.headphone_stream = None
+            self.virtual_stream = None
+            if mark_stopped:
+                self.playing = False
+                self._seek_in_progress = False
 
-            if self.virtual_stream:
-                try: self.virtual_stream.stop()
-                except Exception: pass
-                try: self.virtual_stream.close()
-                except Exception: pass
-                self.virtual_stream = None
+        for stream in (hp_stream, vp_stream):
+            if stream:
+                try:
+                    stream.stop()
+                except Exception:
+                    pass
+                try:
+                    stream.close()
+                except Exception:
+                    pass
 
-            self.playing = False
-            self._dbg("Streams closed (background)")
+        self._dbg("Streams closed (background)")
 
     def _open_streams(self, start_frame_index=0):
         started_any = False
@@ -405,18 +412,21 @@ class AudioPlayer:
         # Use restart lock to ensure only one restart happens at a time
         with self._restart_lock:
             self._dbg(f"Restarting at position {seconds:.3f}s (background) - begin")
-            self._close_streams()
-            frame_index = int(seconds * self.sample_rate)
-            if self._open_streams(start_frame_index=frame_index):
-                with self._stream_lock:
-                    self.position = float(frame_index) / float(self.sample_rate)
-                threading.Thread(target=self._playback_monitor, daemon=True).start()
-                self._dbg("Restarted streams successfully")
-            else:
-                self.playing = False
-                self.window.write_event_value('-PLAYBACK_ERROR-', self.last_error)
-                self._dbg("Restart failed — could not open streams")
-            self._dbg(f"Restarting at position {seconds:.3f}s (background) - end")
+            try:
+                self._close_streams()
+                frame_index = int(seconds * self.sample_rate)
+                if self._open_streams(start_frame_index=frame_index):
+                    with self._stream_lock:
+                        self.position = float(frame_index) / float(self.sample_rate)
+                    threading.Thread(target=self._playback_monitor, daemon=True).start()
+                    self._dbg("Restarted streams successfully")
+                else:
+                    self.playing = False
+                    self.window.write_event_value('-PLAYBACK_ERROR-', self.last_error)
+                    self._dbg("Restart failed - could not open streams")
+            finally:
+                self._seek_in_progress = False
+                self._dbg(f"Restarting at position {seconds:.3f}s (background) - end")
 
     def play_pause(self):
         if not self.audio_loaded: return
@@ -509,8 +519,52 @@ class AudioPlayer:
         # clamp
         target = max(0.0, min(target, self.duration))
 
-        # Perform restart in a dedicated background thread (keeps UI responsive)
+        self._seek_in_progress = True
+        try:
+            if self._attempt_inplace_seek(target):
+                self._seek_in_progress = False
+                return
+        except Exception:
+            self._seek_in_progress = False
+            raise
+
+        self._dbg("In-place seek unavailable -> restarting streams")
         threading.Thread(target=self._restart_at_position_background, args=(target,), daemon=True).start()
+
+    def _attempt_inplace_seek(self, target_seconds: float) -> bool:
+        """Try to move existing streams to target position without reopening."""
+        if not self.playing:
+            return False
+        if self._restart_lock.locked():
+            return False
+
+        instrumental = self.instrumental_audio_data
+        vocal = self.vocal_audio_data
+        max_len = 0
+        if instrumental is not None:
+            max_len = max(max_len, len(instrumental))
+        if vocal is not None:
+            max_len = max(max_len, len(vocal))
+        if max_len <= 0:
+            return False
+
+        frame_index = int(target_seconds * self.sample_rate)
+        frame_index = max(0, min(frame_index, max_len))
+
+        with self._stream_lock:
+            hp_stream = self.headphone_stream
+            vp_stream = self.virtual_stream
+            hp_active = bool(hp_stream and getattr(hp_stream, "active", False))
+            vp_active = bool(vp_stream and getattr(vp_stream, "active", False))
+            if not (hp_active or vp_active):
+                return False
+
+            self._hp_frame[0] = frame_index
+            self._vp_frame[0] = frame_index
+            self.position = float(frame_index) / float(self.sample_rate)
+
+        self._dbg(f"In-place seek applied at {target_seconds:.3f}s (frame {frame_index})")
+        return True
 
     def seek(self, seconds: float):
         """
@@ -521,7 +575,7 @@ class AudioPlayer:
             return
         seconds = max(0.0, min(seconds, self.duration))
 
-        if not self.playing:
+        if not self.playing and not self._seek_in_progress:
             # immediate update while paused
             with self._stream_lock:
                 self.position = seconds
@@ -546,7 +600,7 @@ class AudioPlayer:
         if not self.audio_loaded:
             return
 
-        if not self.playing:
+        if not self.playing and not self._seek_in_progress:
             # if paused, simply adjust position immediately
             new_pos = max(0.0, min(self.position + delta_seconds, self.duration))
             with self._stream_lock:

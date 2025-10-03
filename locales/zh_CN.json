@@ -1,6 +1,5 @@
 {
   "language_name": "简体中文",
-
   "window_title": "白芙妮的伴唱小助手 v2",
   "splash_loading": "读取中",
   "menu_help": "帮助",
@@ -13,7 +12,6 @@
   "restart_prompt": "切换语言需要重新启动应用。是否立即重启？",
   "restart_now": "立即重启",
   "restart_later": "稍后",
-
   "file_explorer_title": "📁 文件管理器",
   "file_explorer_tooltip": "文件面板说明",
   "folder_path_placeholder": "(未选择文件夹)",
@@ -21,9 +19,8 @@
   "back_button": "◀",
   "left_click_choose_instrumental": "左键：选择伴奏",
   "right_click_choose_vocal": "右键：选择人声",
-  "open_folder_button": "打开文件夹",
-  "refresh_button": "刷新",
-
+  "open_folder_button": "📂",
+  "refresh_button": "⟳",
   "vocal_separator_title": "🎤 UVR人声分离工具",
   "gpu_status_checking": "GPU 加速检测中",
   "song_file_label": "歌曲文件:",
@@ -39,6 +36,17 @@
   "stage_separating": "分离中",
   "stage_finalize": "完成处理",
   "total_progress_label": "总进度:",
+  "ui.youtube.toggle": "YouTube 模式",
+  "ui.youtube.url_label": "YouTube 链接：",
+  "ui.youtube.fetch_only": "仅下载",
+  "ui.youtube.fetch_and_sep": "下载并分离",
+  "ui.youtube.tooltip": "输入 YouTube 视频链接以提取音频（.wav）。请确认你具有提取该内容的权限。",
+  "status.youtube.fetching": "正在提取音频",
+  "status.youtube.converting": "正在转换音频",
+  "status.youtube.done": "下载完成",
+  "errors.youtube.invalid": "链接无效",
+  "errors.ytdlp.missing": "未找到 yt-dlp。请将 yt-dlp.exe 放在程序同目录，或添加到 PATH。",
+  "errors.ffmpeg.missing": "未找到 FFmpeg。请确认 ffmpeg\\bin 中有 ffmpeg.exe，或已添加到 PATH。",
 
   "audio_loader_title": "♪ 音频加载器",
   "audio_loader_tooltip": "音频加载器说明",
@@ -64,21 +72,18 @@
   "load_status_normalizing": "音量标准化...",
   "load_status_pitch_shift": "音频升降调...",
   "load_status_mixing": "混合音频...",
-
   "player_title": "🎧 播放器",
   "rewind_button": "<< 5秒",
   "play_button": "▶ 播放",
   "pause_button": "⏸ 暂停",
   "forward_button": "5秒 >>",
   "stop_button": "⏹ 停止",
-  "instrumental_volume_label": "伴奏 🔊 ",
-  "vocal_volume_label": "人声 🔊 ",
-
+  "instrumental_volume_label": "伴奏",
+  "vocal_volume_label": "人声",
   "audio_files": "音频文件",
   "explorer_info_tooltip": "仅显示常见音频格式（如 wav、mp3、flac、m4a、aac、ogg、opus、wma）。部分编码或损坏文件可能无法显示。",
   "player_info_tooltip": "为获得最佳质量，请确保伴奏与人声音频的采样率/长度一致，且两个文件已对齐（同步）。",
   "gpu_info_tooltip": "GPU（图形处理器）加速可加快人声分离；若系统支持且在设置中启用，将使用 GPU。\n若 GPU 未启用或不可用，程序将改用 CPU，速度会较慢。",
-
   "separator_settings_title": "人声分离设置",
   "model_label": "模型:",
   "open_model_folder_button": "打开模型文件夹",
@@ -90,7 +95,6 @@
   "choose_folder_button": "选择文件夹",
   "save_settings_button": "保存设置",
   "close_button": "关闭",
-
   "hop_length_label": "hop_length（分析窗移动）",
   "segment_size_label": "segment_size（分段长度）",
   "overlap_label": "overlap（重叠比例）",
@@ -100,7 +104,6 @@
   "segment_size_tooltip": "segment_size：模型一次处理的音频片段长度。\n数值越大，处理更稳定，但内存占用更高。",
   "overlap_tooltip": "overlap：各片段之间的重叠比例（0.0–0.99）。\n越高可减少拼接痕迹，但会变慢。",
   "batch_size_tooltip": "batch_size：每次送入模型处理的片段数。\n数值越大可更快，但需要更多内存。",
-
   "settings_saved_message": "设置已保存",
   "canceled_message": "已取消",
   "separation_completed_message": "分离完成",
@@ -110,11 +113,9 @@
   "refresh_failed": "刷新失败",
   "refresh_success": "刷新成功",
   "device_not_found": "找不到设备",
-
   "gpu_status_enabled": "GPU 加速已启用",
   "gpu_status_disabled": "GPU 加速已停用",
   "gpu_status_unavailable": "GPU 加速不可用",
-
   "copy_button": "复制",
   "copied_button": "已复制",
   "report_error_button": "报告错误",
@@ -125,7 +126,6 @@
   "cannot_open_folder_msg": "无法打开文件夹",
   "file_not_found_msg": "文件不存在",
   "no_audio_files_msg": "没有音频文件",
-
   "update_title": "检查更新",
   "your_version_label": "您当前版本：",
   "available_version_label": "可用新版本：",
@@ -135,11 +135,9 @@
   "latest_version_msg": "您正在使用最新版本。",
   "update_failed_title": "更新检查失败",
   "update_failed_msg": "检查更新失败：",
-
   "about_title": "关于",
   "about_text": "直播唱歌需要伴奏但又不想让观众听到原唱人声？这款小程序就是为你准备的！集成高质量 AI 人声分离、双轨播放器、升降 Key、音量标准化等强大功能！",
   "about_subtext": "我的第一个程序可能有 Bug，欢迎关注/反馈使用体验～",
   "twitter_portal": "关注推特（X）",
-
   "copy_to_clipboard_failed": "复制到剪贴板可能失败"
 }

@@ -1,4 +1,4 @@
-import FreeSimpleGUI as sg
+﻿import FreeSimpleGUI as sg
 import threading
 import time
 import os
@@ -202,6 +202,16 @@ def preload_resources_blocking(t=lambda k: k):
 # --------- NEW: Sidecar path & model defaults (no extra deps) ----------------
 APPDATA_DIR = os.environ.get("APPDATA") or os.path.expanduser("~")
 MODELS_DIR = os.path.join(APPDATA_DIR, "KHelperV2", "models")  # default model folder used by sidecar
+YTDLP_STORAGE_DIR = os.path.join(APPDATA_DIR, "KHelperV2", "yt-dlp")
+
+HOTKEY_SPACE_EVENT = '_HOTKEY_SPACE_'
+HOTKEY_LEFT_EVENT = '_HOTKEY_LEFT_'
+HOTKEY_RIGHT_EVENT = '_HOTKEY_RIGHT_'
+
+MUTE_ICON_UNMUTED = '🔊'
+MUTE_ICON_MUTED = '🔇'
+MUTE_BUTTON_UNMUTED_COLORS = ('white', '#283b5b')
+MUTE_BUTTON_MUTED_COLORS = ('white', '#d65c5c')
 
 DEFAULT_SEPARATOR_SETTINGS = {
     "model_filename": "UVR-MDX-NET-Inst_HQ_5.onnx",
@@ -230,7 +240,7 @@ def resource_path(relative_path):
 
 def main():
     # Hardcoded application version
-    APP_VERSION = "2.1.0"
+    APP_VERSION = "2.2.0"
 
     # Where to check for version info (per your instruction). The checker will attempt to
     # load the raw content if a GitHub blob url is provided.
@@ -292,6 +302,7 @@ def main():
 
     # 1) Load config first to get a provisional language for the splash
     app_config = config_manager.load_config()
+    app_config.setdefault('yt_mode_enabled', False)
     provisional_lang = app_config.get('language', 'zh_TW')  # or 'en_US' if you prefer
 
     # 2) Initialize i18n with the provisional language so the splash can translate
@@ -323,7 +334,6 @@ def main():
         i18n.t('window_title'),
         layout_with_menu,
         icon=window_icon,
-        # element_justification= 'left',
         finalize=True,
         resizable=True,
         size=(win_w, win_h)
@@ -365,6 +375,27 @@ def main():
     except Exception:
         pass
 
+
+    def _emit_hotkey_event(event_key: str):
+        try:
+            window.write_event_value(event_key, None)
+        except Exception:
+            pass
+
+    HOTKEY_BINDINGS = {
+        '<space>': HOTKEY_SPACE_EVENT,
+        '<Left>': HOTKEY_LEFT_EVENT,
+        '<Right>': HOTKEY_RIGHT_EVENT,
+    }
+    for binding, event_key in HOTKEY_BINDINGS.items():
+        try:
+            window.bind(binding, event_key)
+        except Exception:
+            try:
+                window.TKroot.bind(binding, lambda e, key=event_key: _emit_hotkey_event(key))
+            except Exception:
+                pass
+
     # Ensure total progress is initialized (stable layout).
     try:
         window['-SEP_TOTAL_PROGRESS-'].update(0)
@@ -374,7 +405,7 @@ def main():
 
     player = AudioPlayer(window, debug=True)
     explorer = FileExplorer()
-    yt_downloader = YTDownloader()
+    yt_downloader = YTDownloader(storage_root=YTDLP_STORAGE_DIR)
     listbox_items = []
     listbox_display_items = []
     listbox_truncated_map = {}
@@ -458,7 +489,49 @@ def main():
                 window['-LOAD-'].update(disabled=False)
             except Exception:
                 pass
+    
+    def _is_element_disabled(key: str) -> bool:
+        if key not in window.AllKeysDict:
+            return True
+        elem = window[key]
+        if hasattr(elem, 'Disabled'):
+            try:
+                return bool(elem.Disabled)
+            except Exception:
+                pass
+        try:
+            return str(elem.Widget['state']) == 'disabled'
+        except Exception:
+            return False
 
+    _HOTKEY_BLOCK_CLASSES = {'Entry', 'TEntry', 'Text', 'TCombobox', 'Combobox', 'Listbox', 'TSpinbox', 'Spinbox', 'TButton', 'TScale'}
+
+    def _hotkey_focus_blocked() -> bool:
+        try:
+            root = window.TKroot
+            if not root:
+                return False
+            widget = root.focus_get()
+            if not widget:
+                return False
+            return widget.winfo_class() in _HOTKEY_BLOCK_CLASSES
+        except Exception:
+            return False
+
+
+    def _rewind_5():
+        player.rewind_5sec()
+        try:
+            window['-PROGRESS-'].update(value=player.position)
+        except Exception:
+            pass
+
+    def _forward_5():
+        player.forward_5sec()
+        try:
+            window['-PROGRESS-'].update(value=player.position)
+        except Exception:
+            pass
     listbox_widget = window['-FILE_LIST-'].Widget
     listbox_font = tkfont.Font(font=listbox_widget.cget('font'))
     explorer_text_max_px = max(120, EXPLORER_PANEL_WIDTH - 24)
@@ -653,6 +726,30 @@ def main():
     player.instrumental_volume = app_config.get('last_volume', 70) / 100.0
     window['-VOCAL_VOLUME-'].update(value=app_config.get('last_vocal_volume', 100))
     player.vocal_volume = app_config.get('last_vocal_volume', 100) / 100.0
+
+    def _coerce_volume(raw_value, fallback):
+        try:
+            coerced = int(raw_value)
+        except (TypeError, ValueError):
+            coerced = fallback
+        return max(0, min(150, coerced))
+
+    inst_prev_volume = _coerce_volume(app_config.get('last_volume', 70), 70)
+    vocal_prev_volume = _coerce_volume(app_config.get('last_vocal_volume', 100), 100)
+    inst_muted = False
+    vocal_muted = False
+
+    def _set_mute_button_state(key: str, muted: bool):
+        icon = MUTE_ICON_MUTED if muted else MUTE_ICON_UNMUTED
+        colors = MUTE_BUTTON_MUTED_COLORS if muted else MUTE_BUTTON_UNMUTED_COLORS
+        try:
+            window[key].update(text=icon, button_color=colors)
+        except Exception:
+            pass
+
+    _set_mute_button_state('-INST_MUTE-', inst_muted)
+    _set_mute_button_state('-VOC_MUTE-', vocal_muted)
+
     window['-PITCH_SLIDER-'].update(value=app_config.get('last_pitch', 0))
     window['-SAMPLE_RATE-'].update(value=app_config.get('last_sample_rate', 44100))
 
@@ -677,7 +774,44 @@ def main():
     yt_last_download_pct = 0
     yt_blend_active = False
     yt_current_status = None
+
+    def set_yt_controls_enabled(enabled: bool) -> None:
+        base_enabled = bool(enabled)
+        effective = base_enabled and not player.playing and not separating
+        keys = ('-YT_DL_ONLY-', '-YT_DL_SEP-', '-YT_MODE-')
+        for key in keys:
+            try:
+                if key in window.AllKeysDict:
+                    window[key].update(disabled=not effective)
+            except Exception:
+                pass
+        try:
+            if '-YT_URL-' in window.AllKeysDict:
+                window['-YT_URL-'].update(disabled=not effective)
+        except Exception:
+            pass
     yt_pending_clear = False
+
+
+    def apply_yt_mode_state(enabled: bool, job_active: bool | None = None) -> None:
+        current_active = bool(yt_job_active if job_active is None else job_active)
+        try:
+            window['-YT_MODE-'].update(value=enabled)
+        except Exception:
+            pass
+        try:
+            window['-FILE_ROW-'].update(visible=not enabled)
+            window['-FILE_BUTTONS-'].update(visible=not enabled)
+            window['-YT_ROW-'].update(visible=enabled)
+            window['-YT_BUTTONS-'].update(visible=enabled)
+            if '-YT_TERMINATE-' in window.AllKeysDict:
+                window['-YT_TERMINATE-'].update(visible=current_active and enabled, disabled=player.playing)
+        except Exception:
+            pass
+        set_yt_controls_enabled(not current_active)
+
+    initial_yt_mode = bool(app_config.get('yt_mode_enabled', False))
+    apply_yt_mode_state(initial_yt_mode, job_active=False)
 
     set_msg_expire_at = 0
     device_scan_msg_expire_at = 0
@@ -937,21 +1071,8 @@ def main():
         music_dir = os.path.join(home, 'Music')
         return os.path.join(music_dir, 'KHelperV2', 'YouTube')
 
-    def set_yt_controls_enabled(enabled: bool) -> None:
-        base_enabled = bool(enabled)
-        effective = base_enabled and not player.playing and not separating
-        keys = ('-YT_DL_ONLY-', '-YT_DL_SEP-', '-YT_MODE-')
-        for key in keys:
-            try:
-                if key in window.AllKeysDict:
-                    window[key].update(disabled=not effective)
-            except Exception:
-                pass
-        try:
-            if '-YT_URL-' in window.AllKeysDict:
-                window['-YT_URL-'].update(disabled=not effective)
-        except Exception:
-            pass
+
+
 
     # (legacy shim kept for minimal change; now unused by sidecar path)
     def separator_progress_callback(payload: dict):
@@ -1328,6 +1449,17 @@ def main():
                 populate_listbox()
             except Exception:
                 pass
+
+        if isinstance(event, str):
+            if event.startswith(HOTKEY_SPACE_EVENT):
+                if not _hotkey_focus_blocked() and not _is_element_disabled('-PLAY_PAUSE-'):
+                    player.play_pause()
+            elif event.startswith(HOTKEY_LEFT_EVENT):
+                if not _hotkey_focus_blocked() and not _is_element_disabled('-REWIND-'):
+                    _rewind_5()
+            elif event.startswith(HOTKEY_RIGHT_EVENT):
+                if not _hotkey_focus_blocked() and not _is_element_disabled('-FORWARD-'):
+                    _forward_5()
         
         # --- language click handler ---
         code = _extract_lang_code(event)
@@ -1447,16 +1579,11 @@ def main():
 
         if event == '-YT_MODE-':
             yt_enabled = bool(values.get('-YT_MODE-'))
-            try:
-                window['-FILE_ROW-'].update(visible=not yt_enabled)
-                window['-FILE_BUTTONS-'].update(visible=not yt_enabled)
-                window['-YT_ROW-'].update(visible=yt_enabled)
-                window['-YT_BUTTONS-'].update(visible=yt_enabled)
-                if '-YT_TERMINATE-' in window.AllKeysDict:
-                    window['-YT_TERMINATE-'].update(visible=yt_job_active and yt_enabled, disabled=player.playing)
-            except Exception:
-                pass
-            set_yt_controls_enabled(not yt_job_active)
+            values['-YT_MODE-'] = yt_enabled
+            if app_config.get('yt_mode_enabled') != yt_enabled:
+                app_config['yt_mode_enabled'] = yt_enabled
+                config_manager.save_config(app_config)
+            apply_yt_mode_state(yt_enabled)
 
         if event == '-PLAYER_DEBUG-':
             print("[PLAYER_DEBUG]", values[event])
@@ -2295,14 +2422,76 @@ def main():
             config_manager.save_config(app_config)
             handle_input_change()
 
+        if event == "-INST_MUTE-":
+            if inst_muted:
+                restore = _coerce_volume(inst_prev_volume, app_config.get('last_volume', 70))
+                inst_prev_volume = restore
+                try:
+                    window['-INST_VOLUME-'].update(value=restore)
+                except Exception:
+                    pass
+                values['-INST_VOLUME-'] = restore
+                player.instrumental_volume = restore / 100.0
+                app_config['last_volume'] = restore
+                config_manager.save_config(app_config)
+                inst_muted = False
+            else:
+                current = _coerce_volume(values.get('-INST_VOLUME-'), inst_prev_volume)
+                inst_prev_volume = current
+                try:
+                    window['-INST_VOLUME-'].update(value=0)
+                except Exception:
+                    pass
+                values['-INST_VOLUME-'] = 0
+                player.instrumental_volume = 0.0
+                app_config['last_volume'] = 0
+                config_manager.save_config(app_config)
+                inst_muted = True
+            _set_mute_button_state('-INST_MUTE-', inst_muted)
+
+        if event == "-VOC_MUTE-":
+            if vocal_muted:
+                restore = _coerce_volume(vocal_prev_volume, app_config.get('last_vocal_volume', 100))
+                vocal_prev_volume = restore
+                try:
+                    window['-VOCAL_VOLUME-'].update(value=restore)
+                except Exception:
+                    pass
+                values['-VOCAL_VOLUME-'] = restore
+                player.vocal_volume = restore / 100.0
+                app_config['last_vocal_volume'] = restore
+                config_manager.save_config(app_config)
+                vocal_muted = False
+            else:
+                current = _coerce_volume(values.get('-VOCAL_VOLUME-'), vocal_prev_volume)
+                vocal_prev_volume = current
+                try:
+                    window['-VOCAL_VOLUME-'].update(value=0)
+                except Exception:
+                    pass
+                values['-VOCAL_VOLUME-'] = 0
+                player.vocal_volume = 0.0
+                app_config['last_vocal_volume'] = 0
+                config_manager.save_config(app_config)
+                vocal_muted = True
+            _set_mute_button_state('-VOC_MUTE-', vocal_muted)
+
         if event == "-INST_VOLUME-":
-            vol = int(values["-INST_VOLUME-"])
+            vol = _coerce_volume(values["-INST_VOLUME-"], inst_prev_volume)
+            if inst_muted:
+                inst_muted = False
+                _set_mute_button_state('-INST_MUTE-', inst_muted)
+            inst_prev_volume = vol
             player.instrumental_volume = vol / 100.0
             app_config['last_volume'] = vol
             config_manager.save_config(app_config)
 
         if event == "-VOCAL_VOLUME-":
-            vol = int(values["-VOCAL_VOLUME-"])
+            vol = _coerce_volume(values["-VOCAL_VOLUME-"], vocal_prev_volume)
+            if vocal_muted:
+                vocal_muted = False
+                _set_mute_button_state('-VOC_MUTE-', vocal_muted)
+            vocal_prev_volume = vol
             player.vocal_volume = vol / 100.0
             app_config['last_vocal_volume'] = vol
             config_manager.save_config(app_config)
@@ -2352,11 +2541,9 @@ def main():
             pending_seek_time = now
 
         if event == "-REWIND-":
-            player.rewind_5sec()
-            window["-PROGRESS-"].update(value=player.position)
+            _rewind_5()
         if event == "-FORWARD-":
-            player.forward_5sec()
-            window["-PROGRESS-"].update(value=player.position)
+            _forward_5()
 
         if player.playing and player.position >= player.duration:
             player.stop_immediate()
